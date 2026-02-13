@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Precision Wire-O Binder</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <style>
+        :root {
+            --book-width: 440px;
+            --book-height: 580px;
+            --wire-color: #b0b0b0;
+            --bg-color: #d1d5db;
+            --inner-gap: 22px;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+
+        .tray {
+            position: relative;
+            padding: 15px 25px;
+            background: #94a3b8;
+            border-radius: 8px;
+            box-shadow: inset 0 10px 20px rgba(0,0,0,0.2), 0 10px 30px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #controls {
+            position: absolute;
+            left: 10px;
+            top: 10px;
+            z-index: 7000;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        #controls select, #controls input {
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .book-wrapper {
+            position: relative;
+            width: calc((var(--book-width) * 2) + var(--inner-gap));
+            height: var(--book-height);
+            perspective: 2500px;
+        }
+
+        .spiral-container {
+            position: absolute;
+            left: 50%;
+            top: 10px;
+            bottom: 10px;
+            width: 32px;
+            transform: translateX(-50%);
+            z-index: 5000;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            pointer-events: none;
+        }
+
+        .ring {
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, #888, #eee, #888);
+            border-top: 1px solid var(--wire-color);
+            border-bottom: 1px solid #555;
+            border-radius: 2px;
+        }
+
+        .page {
+            position: absolute;
+            width: var(--book-width);
+            height: var(--book-height);
+            right: 0;
+            transform-origin: left center;
+            transform-style: preserve-3d;
+            transition: transform 0.8s cubic-bezier(0.645, 0.045, 0.355, 1);
+            cursor: pointer;
+        }
+
+        .page-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: white;
+            backface-visibility: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .back { transform: rotateY(180deg); }
+        .page.flipped { transform: rotateY(-180deg) translateX(calc(var(--inner-gap) * -1)); }
+        canvas { width: 100%; height: 100%; display: block; }
+
+        .hole {
+            width: 10px;
+            height: 10px;
+            background: #1e293b;
+            border-radius: 1px;
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .nav-btn {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.4);
+            border: none;
+            width: 30px;
+            height: 60px;
+            cursor: pointer;
+            z-index: 8000;
+        }
+        #prevBtn { left: 0; }
+        #nextBtn { right: 0; }
+    </style>
+</head>
+<body>
+
+    <button class="nav-btn" id="prevBtn">&#10094;</button>
+    <button class="nav-btn" id="nextBtn">&#10095;</button>
+
+    <div class="tray">
+        <div id="controls">
+            <label style="font-size: 10px; font-weight: bold;">SELECT PDF</label>
+            <select id="pdfSelect">
+                <option value="">-- Choose --</option>
+                <option value="Applied_Math_Study_Materials_2024-25.pdf">Applied Math 2024-25</option>
+            </select>
+            <hr>
+            <label style="font-size: 10px; font-weight: bold;">OR BROWSE LOCALLY</label>
+            <input type="file" id="fileInput" accept="application/pdf">
+        </div>
+
+        <div class="book-wrapper">
+            <div class="spiral-container" id="spiral"></div>
+            <div id="book-pages" style="transform-style: preserve-3d;"></div>
+        </div>
+    </div>
+
+<script>
+    const bookContainer = document.getElementById('book-pages');
+    const pdfSelect = document.getElementById('pdfSelect');
+    const fileInput = document.getElementById('fileInput');
+    let pages = [];
+    let currentPagePair = -1;
+
+    // Create Spiral loops
+    for(let i=0; i<18; i++) {
+        const ring = document.createElement('div');
+        ring.className = 'ring';
+        document.getElementById('spiral').appendChild(ring);
+    }
+
+    // Handle Auto-Fetch from Dropdown
+    pdfSelect.addEventListener('change', async (e) => {
+        const fileName = e.target.value;
+        if (!fileName) return;
+
+        try {
+            const response = await fetch(fileName);
+            if (!response.ok) throw new Error("CORS or File Not Found");
+            const data = await response.arrayBuffer();
+            renderPDF(data);
+        } catch (err) {
+            alert("Browser Security Block: To use the dropdown, you must run this via a 'Local Server' or use the 'Browse' button below.");
+        }
+    });
+
+    // Handle Manual File Upload
+    fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function() { renderPDF(this.result); };
+        reader.readAsArrayBuffer(file);
+    });
+
+    async function renderPDF(data) {
+        const pdf = await pdfjsLib.getDocument(new Uint8Array(data)).promise;
+        bookContainer.innerHTML = '';
+        pages = [];
+        currentPagePair = -1;
+
+        for (let i = 1; i <= pdf.numPages; i += 2) {
+            const pageEl = document.createElement('div');
+            pageEl.className = 'page';
+            pageEl.style.zIndex = pdf.numPages - i;
+
+            const front = await createFace(pdf, i, 'front');
+            const back = (i + 1 <= pdf.numPages) ? await createFace(pdf, i + 1, 'back') : document.createElement('div');
+            if(!back.classList.contains('page-face')) back.className = 'page-face back';
+
+            pageEl.appendChild(front);
+            pageEl.appendChild(back);
+            pageEl.onclick = () => flipToPage(pages.indexOf(pageEl));
+            
+            bookContainer.appendChild(pageEl);
+            pages.push(pageEl);
+        }
+    }
+
+    async function createFace(pdf, num, type) {
+        const face = document.createElement('div');
+        face.className = 'page-face ' + type;
+        
+        const holesContainer = document.createElement('div');
+        holesContainer.style = `position:absolute; ${type==='front'?'left:5px':'right:5px'}; height:100%; display:flex; flex-direction:column; justify-content:space-around; padding: 10px 0;`;
+        
+        for(let j=0; j<36; j++) {
+            const h = document.createElement('div');
+            h.className = 'hole';
+            holesContainer.appendChild(h);
+        }
+        face.appendChild(holesContainer);
+
+        const canvas = document.createElement('canvas');
+        const page = await pdf.getPage(num);
+        const viewport = page.getViewport({ scale: 1.5 });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+        face.appendChild(canvas);
+        return face;
+    }
+
+    function flipToPage(index) {
+        if (index > currentPagePair) {
+            for (let i = currentPagePair + 1; i <= index; i++) {
+                pages[i].classList.add('flipped');
+                pages[i].style.zIndex = i + 1;
+            }
+        } else {
+            for (let i = currentPagePair; i > index; i--) {
+                pages[i].classList.remove('flipped');
+                pages[i].style.zIndex = pages.length - i;
+            }
+        }
+        currentPagePair = index;
+    }
+
+    document.getElementById('nextBtn').onclick = () => { if (currentPagePair < pages.length - 1) flipToPage(currentPagePair + 1); };
+    document.getElementById('prevBtn').onclick = () => { if (currentPagePair >= 0) flipToPage(currentPagePair - 1); };
+</script>
+</body>
+</html>
