@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>3D Precision Binder (Refined Hinge & Compact Tray)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+<style>
+:root {
+    --book-width: 440px;
+    --book-height: 580px;
+    --bg-color: #abb1bb; /* Dimer background */
+    --inner-gap: 8px;    /* Tighter gutter */
+    --tray-color: #64748b; /* Dimmer, more professional slate */
+}
+
+body {
+    background-color: var(--bg-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+    font-family: sans-serif;
+    overflow: hidden;
+}
+
+/* Reduced size and dimmer color for the tray */
+.tray {
+    position: relative;
+    padding: 10px 15px; 
+    background: var(--tray-color);
+    border-radius: 6px;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.3), 0 15px 30px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#controls {
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    z-index: 7000;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 8px;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    width: 130px;
+}
+
+.book-wrapper {
+    position: relative;
+    width: calc((var(--book-width) * 2) + var(--inner-gap));
+    height: var(--book-height);
+    perspective: 2500px;
+}
+
+/* Gutter gap styling matching your image */
+.gutter-gap {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    width: var(--inner-gap);
+    height: 100%;
+    pointer-events: none;
+    z-index: 4000;
+    background: linear-gradient(
+        to right,
+        rgba(0,0,0,0.2) 0%,
+        rgba(255,255,255,0.4) 50%,
+        rgba(0,0,0,0.2) 100%
+    );
+}
+
+.page {
+    position: absolute;
+    width: var(--book-width);
+    height: var(--book-height);
+    right: 0;
+    transform-origin: left center;
+    transform-style: preserve-3d;
+    transition: transform 0.8s cubic-bezier(0.645, 0.045, 0.355, 1);
+    cursor: pointer;
+}
+
+.page-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: white;
+    backface-visibility: hidden;
+    overflow: hidden;
+    box-shadow: inset 2px 0 5px rgba(0,0,0,0.1); /* Subtle depth */
+}
+
+.back { 
+    transform: rotateY(180deg); 
+    background: #f0f0f0; 
+}
+
+/* Eliminated white space by matching translation exactly to the gutter width */
+.page.flipped { 
+    transform: rotateY(-180deg) translateX(calc(var(--inner-gap) * -1)); 
+}
+
+canvas { 
+    width: 100%; 
+    height: 100%; 
+    display: block;
+    object-fit: fill; /* Ensures canvas fills the face without white borders */
+}
+
+.nav-btn {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255,255,255,0.3);
+    border: none;
+    width: 30px;
+    height: 60px;
+    cursor: pointer;
+    z-index: 8000;
+}
+#prevBtn { left: 5px; }
+#nextBtn { right: 5px; }
+</style>
+</head>
+<body>
+
+<button class="nav-btn" id="prevBtn">&#10094;</button>
+<button class="nav-btn" id="nextBtn">&#10095;</button>
+
+<div class="tray">
+    <div id="controls">
+        <label style="font-size: 9px; font-weight: bold;">PDF SELECT</label>
+        <select id="pdfSelect" style="font-size: 10px;">
+            <option value="">-- Choose --</option>
+            <option value="Applied_Math_Study_Materials_2024-25.pdf">Applied Math</option>
+        </select>
+        <input type="file" id="fileInput" accept="application/pdf" style="font-size: 9px;">
+    </div>
+
+    <div class="book-wrapper">
+        <div id="book-pages" style="transform-style: preserve-3d;"></div>
+        <div class="gutter-gap"></div>
+    </div>
+</div>
+
+<script>
+const bookContainer = document.getElementById('book-pages');
+const pdfSelect = document.getElementById('pdfSelect');
+const fileInput = document.getElementById('fileInput');
+let pages = [];
+let currentPagePair = -1;
+
+pdfSelect.addEventListener('change', async (e) => {
+    const fileName = e.target.value;
+    if (!fileName) return;
+    try {
+        const response = await fetch(fileName);
+        const data = await response.arrayBuffer();
+        renderPDF(data);
+    } catch (err) {
+        alert("CORS Block: Use a local server or the Browse button.");
+    }
+});
+
+fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function() { renderPDF(this.result); };
+    reader.readAsArrayBuffer(file);
+});
+
+async function renderPDF(data) {
+    const pdf = await pdfjsLib.getDocument(new Uint8Array(data)).promise;
+    bookContainer.innerHTML = '';
+    pages = [];
+    currentPagePair = -1;
+
+    for (let i = 1; i <= pdf.numPages; i += 2) {
+        const pageEl = document.createElement('div');
+        pageEl.className = 'page';
+        pageEl.style.zIndex = pdf.numPages - i;
+
+        const front = await createFace(pdf, i, 'front');
+        const back = (i + 1 <= pdf.numPages)
+            ? await createFace(pdf, i + 1, 'back')
+            : document.createElement('div');
+
+        if (!back.classList.contains('page-face')) {
+            back.className = 'page-face back';
+            back.style.background = '#e5e7eb'; // Slightly darker blank page
+        }
+
+        pageEl.appendChild(front);
+        pageEl.appendChild(back);
+        pageEl.onclick = () => flipToPage(pages.indexOf(pageEl));
+        
+        bookContainer.appendChild(pageEl);
+        pages.push(pageEl);
+    }
+}
+
+async function createFace(pdf, num, type) {
+    const face = document.createElement('div');
+    face.className = 'page-face ' + type;
+
+    const canvas = document.createElement('canvas');
+    const page = await pdf.getPage(num);
+    // Increased scale slightly to ensure high resolution fills the container
+    const viewport = page.getViewport({ scale: 2 }); 
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    
+    await page.render({
+        canvasContext: canvas.getContext('2d'),
+        viewport: viewport
+    }).promise;
+
+    face.appendChild(canvas);
+    return face;
+}
+
+function flipToPage(index) {
+    if (index > currentPagePair) {
+        for (let i = currentPagePair + 1; i <= index; i++) {
+            pages[i].classList.add('flipped');
+            pages[i].style.zIndex = 100 + i;
+        }
+    } else {
+        for (let i = currentPagePair; i > index; i--) {
+            pages[i].classList.remove('flipped');
+            pages[i].style.zIndex = pages.length - i;
+        }
+    }
+    currentPagePair = index;
+}
+
+document.getElementById('nextBtn').onclick = () => {
+    if (currentPagePair < pages.length - 1) flipToPage(currentPagePair + 1);
+};
+
+document.getElementById('prevBtn').onclick = () => {
+    if (currentPagePair >= 0) flipToPage(currentPagePair - 1);
+};
+</script>
+</body>
+</html>
