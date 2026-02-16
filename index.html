@@ -1,289 +1,585 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>3D Pro-Binder | 4th Symposium 2026</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-<style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Pro-Binder · Symposium 2026</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <style>
     :root {
-        --book-width: 400px;
-        --book-height: 550px;
-        --bg-color: #ffffff;      
-        --binder-color: #e2e8f0;  
-        --spine-color: #1e3a8a;   
-        --inner-gap: 8px;
-        --page-speed: 0.8s;
+      --book-width: 400px;
+      --book-height: 550px;
+      --bg-color: #ffffff;      
+      --binder-color: #e2e8f0;  
+      --spine-color: #1e3a8a;   
+      --inner-gap: 8px;
+      --page-speed: 0.8s;
+      --success-glow: #ecfccb;
+      --cover-bg: #f8fafc;
+      --panel-bg: #2d2f31;
+      --accent: #a3e635;
     }
 
     body {
-        background-color: var(--bg-color);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-        margin: 0;
-        font-family: sans-serif;
-        overflow: hidden;
+      background-color: var(--bg-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      font-family: 'Inter', system-ui, sans-serif;
+      overflow: hidden;
+      transition: background-color 0.3s ease;
     }
 
+    body.success-glow {
+      background-color: #f1f9e6;
+      box-shadow: inset 0 0 40px #d9f0b2;
+    }
+
+    /* ---- COMPACT FLAT BUTTON BAR (smaller, no shadow, moved up) ---- */
+    .master-bar {
+      position: absolute;
+      top: 8px;                  /* moved up from 20px to 8px */
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20000;
+      display: flex;
+      gap: 8px;                   /* reduced gap */
+      background: white;
+      padding: 4px 12px;          /* smaller padding */
+      border-radius: 40px;
+      border: 1px solid #cbd5e1;
+      /* NO box-shadow */
+      align-items: center;
+      backdrop-filter: blur(4px);
+      background: rgba(255,255,255,0.95);
+      font-size: 12px;            /* smaller base font */
+    }
+
+    .bar-section {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .divider {
+      width: 1px;
+      height: 20px;               /* shorter divider */
+      background: #cbd5e1;
+    }
+
+    .master-bar select {
+      font-size: 11px;            /* smaller */
+      padding: 4px 8px;
+      border-radius: 30px;
+      border: 1px solid #94a3b8;
+      background: #f8fafc;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .master-bar .file-label {
+      background: #1e3a8a;
+      color: white;
+      padding: 4px 12px;          /* smaller */
+      border-radius: 30px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+      border: none;
+      display: inline-block;
+      line-height: normal;
+    }
+
+    .master-bar .file-label:hover {
+      background: #2563eb;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    /* status light integrated, more compact */
+    .status-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: #f1f4f9;
+      padding: 3px 10px;
+      border-radius: 40px;
+      font-size: 11px;
+      color: #0f172a;
+      white-space: nowrap;
+    }
+
+    .status-light {
+      width: 10px;                /* smaller light */
+      height: 10px;
+      border-radius: 50%;
+      background: #3f3f46;
+      transition: all 0.4s ease;
+    }
+
+    .status-light.loading {
+      background: #fbbf24;
+      box-shadow: 0 0 8px #fbbf24; /* keep glow for loading */
+      animation: pulse 1s infinite;
+    }
+
+    .status-light.active {
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+
+    /* original hardcover structure - untouched */
     .hardcover {
-        position: relative;
-        width: calc((var(--book-width) * 2) + var(--inner-gap) + 40px);
-        height: calc(var(--book-height) + 30px);
-        background: var(--binder-color);
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 20px 50px rgba(0,0,0,0.1);
-        perspective: 2500px;
+      position: relative;
+      width: calc((var(--book-width) * 2) + var(--inner-gap) + 40px);
+      height: calc(var(--book-height) + 30px);
+      background: var(--binder-color);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+      perspective: 2500px;
     }
 
-    /* BOLD BLUE LINE - MATCHES BOOK HEIGHT */
     .spine-ridge {
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 14px;
-        height: var(--book-height); 
-        background: var(--spine-color);
-        z-index: 40;
-        box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 14px;
+      height: var(--book-height); 
+      background: var(--spine-color);
+      z-index: 40;
+      box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
     }
 
     .book-wrapper {
-        position: relative;
-        width: calc((var(--book-width) * 2) + var(--inner-gap));
-        height: var(--book-height);
-        transform-style: preserve-3d;
-        z-index: 10;
+      position: relative;
+      width: calc((var(--book-width) * 2) + var(--inner-gap));
+      height: var(--book-height);
+      transform-style: preserve-3d;
+      z-index: 10;
     }
 
     .page {
-        position: absolute;
-        width: var(--book-width);
-        height: var(--book-height);
-        right: 0;
-        transform-origin: left center;
-        transform-style: preserve-3d;
-        transition: transform var(--page-speed) cubic-bezier(0.645, 0.045, 0.355, 1);
-        cursor: pointer;
+      position: absolute;
+      width: var(--book-width);
+      height: var(--book-height);
+      right: 0;
+      transform-origin: left center;
+      transform-style: preserve-3d;
+      transition: transform var(--page-speed) cubic-bezier(0.645, 0.045, 0.355, 1);
+      cursor: pointer;
     }
 
     .page-face {
-        position: absolute;
-        width: 100%;
-        height: 100%;
-        background: white;
-        backface-visibility: hidden;
-        border: 1px solid #ddd;
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: white;
+      backface-visibility: hidden;
+      border: 1px solid #ddd;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-direction: column;
+      padding: 20px;
+      box-sizing: border-box;
     }
 
     .back { transform: rotateY(180deg); background: #f8fafc; }
     .page.flipped { transform: rotateY(-180deg) translateX(calc(var(--inner-gap) * -1)); }
 
-    canvas { width: 100%; height: 100%; display: block; }
-
-    /* HOVER-TO-REVEAL DRAWER - Fixed Rollback */
-    #controls {
-        position: absolute;
-        top: 0;
-        left: 20px;
-        z-index: 9000;
-        background: white;
-        padding: 8px 12px;
-        border-radius: 0 0 8px 8px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        border: 1px solid #cbd5e1;
-        border-top: none;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        width: 210px;
-        transition: transform 0.4s ease-in-out;
-        transform: translateY(-78%); /* Rolled up: only label visible */
+    canvas { width: 100%; height: 100%; display: block; object-fit: contain; }
+    .cover-image { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .cover-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1e293b;
+      text-align: center;
+      word-break: break-word;
+      background: rgba(255,255,240,0.8);
+      padding: 12px;
+      border-radius: 12px;
+      margin: 20px;
     }
-
-    #controls:hover {
-        transform: translateY(0); /* Rolled down: full menu visible */
+    .back-quote {
+      font-size: 18px;
+      font-style: italic;
+      color: #334155;
+      text-align: center;
+      max-width: 80%;
+      border-top: 2px solid #cbd5e1;
+      padding-top: 20px;
+      margin-top: 20px;
     }
 
     .nav-btn {
-        position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
-        background: var(--spine-color);
-        color: white;
-        border: none;
-        width: 45px;
-        height: 80px;
-        cursor: pointer;
-        z-index: 8000;
-        font-size: 30px;
-        border-radius: 5px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0.8;
-        transition: opacity 0.3s;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--spine-color);
+      color: white;
+      border: none;
+      width: 45px;
+      height: 80px;
+      cursor: pointer;
+      z-index: 8000;
+      font-size: 30px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.8;
+      transition: opacity 0.3s;
     }
     
     #prevBtn { left: -60px; }
     #nextBtn { right: -60px; }
 
     #status-msg {
-        position: fixed;
-        bottom: 10px;
-        font-size: 11px;
-        color: #94a3b8;
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      background: rgba(30, 58, 138, 0.2);
+      backdrop-filter: blur(4px);
+      padding: 4px 16px;
+      border-radius: 40px;
+      color: #0f172a;
+      font-weight: 500;
+      z-index: 20000;
     }
-</style>
+  </style>
 </head>
 <body>
 
-<div id="status-msg">Status: Checking for PDF in folder...</div>
-
-<div class="hardcover">
-    <div id="controls">
-        <label style="font-size: 11px; font-weight: bold; color: #1e3a8a; cursor: pointer; text-align: center;">▼ SELECT DOCUMENT</label>
-        <select id="pdfSelect" style="font-size: 11px; padding: 4px;">
-            <option value="report.pdf">4th Symposium 2026 Report</option>
-            <option value="https://raw.githubusercontent.com/hameedktk09/Pdf-Flipper/main/Applied%20Math%20Study%20Materials%202024-25.pdf">Online Backup Link</option>
-        </select>
-        <input type="file" id="fileInput" accept="application/pdf" style="font-size: 9px;">
+  <!-- COMPACT FLAT BAR: no shadow, smaller, moved up -->
+  <div class="master-bar">
+    <div class="bar-section">
+      <select id="pdfSelect">
+        <option value="report.pdf">📁 4th Symposium 2026 Report</option>
+        <option value="https://raw.githubusercontent.com/hameedktk09/Pdf-Flipper/main/Applied%20Math%20Study%20Materials%202024-25.pdf">🌐 Online Backup</option>
+      </select>
+      <label for="fileInput" class="file-label">Choose File</label>
+      <input type="file" id="fileInput" accept="application/pdf">
     </div>
 
+    <span class="divider"></span>
+
+    <div class="status-group">
+      <div id="readyLight" class="status-light"></div>
+      <span id="pageLabel" class="page-info">p.1-1/0</span>
+    </div>
+  </div>
+
+  <!-- bottom status message (kept) -->
+  <div id="status-msg">📄 Status: idle · select PDF</div>
+
+  <div class="hardcover">
     <button class="nav-btn" id="prevBtn">&#10094;</button>
     <button class="nav-btn" id="nextBtn">&#10095;</button>
     
     <div class="spine-ridge"></div>
     
     <div class="book-wrapper">
-        <div id="book-pages" style="transform-style: preserve-3d;"></div>
+      <div id="book-pages" style="transform-style: preserve-3d;"></div>
     </div>
-</div>
+  </div>
 
-<audio id="flipSound" src="adainpto.wav" preload="auto"></audio>
+  <audio id="flipSound" src="data:audio/wav;base64,UklGRlwAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YWEAAACAgICAf39/f39/f3+AgICAf39/f39/f3+AgICAf39/f39/f3+AgICAf39/f39/f3+AgICAf39/f39/f38=" preload="auto"></audio>
 
-<script>
-const pdfjsLib = window['pdfjs-dist/build/pdf'];
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+  <script>
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-const bookContainer = document.getElementById('book-pages');
-const statusMsg = document.getElementById('status-msg');
-const flipSound = document.getElementById('flipSound');
+    const bookContainer = document.getElementById('book-pages');
+    const statusMsg = document.getElementById('status-msg');
+    const flipSound = document.getElementById('flipSound');
+    const bodyEl = document.body;
+    const readyLight = document.getElementById('readyLight');
+    const pageLabel = document.getElementById('pageLabel');
 
-function updateStatus(text) {
-    statusMsg.innerText = "Status: " + text;
-}
+    // ----- dynamic cover generation -----
+    function updateStatus(text, success = false, isLoading = false) {
+      statusMsg.innerText = "📄 " + text;
+      
+      if (isLoading) {
+        readyLight.className = 'status-light loading';
+        pageLabel.innerText = "⏳ loading";
+      } else if (success) {
+        readyLight.className = 'status-light active';
+        bodyEl.classList.add('success-glow');
+        setTimeout(() => bodyEl.classList.remove('success-glow'), 2000);
+      } else {
+        readyLight.className = 'status-light';
+        bodyEl.classList.remove('success-glow');
+        if (!pdfDocRef) pageLabel.innerText = "p.1-1/0";
+      }
+    }
 
-// AUTO-FETCH ATTEMPT ON LOAD
-window.onload = () => {
-    // Try to load 'report.pdf' automatically from your folder
-    autoFetchPDF('report.pdf');
-};
+    window.onload = () => {
+      autoFetchPDF('report.pdf');
+    };
 
-async function autoFetchPDF(url) {
-    updateStatus("Searching for " + url + "...");
-    try {
+    async function autoFetchPDF(url, customTitle = '') {
+      updateStatus("searching for " + url + " ...", false, true);
+      try {
         const response = await fetch(url);
-        if (!response.ok) throw new Error("File not found in folder");
+        if (!response.ok) throw new Error("File not found locally");
         const data = await response.arrayBuffer();
-        renderPDF(data);
-    } catch (err) {
-        updateStatus("Could not auto-fetch. Please use 'Select Document' menu.");
+        let pdfTitle = customTitle || url.split('/').pop().replace('.pdf', '').replace(/%20/g, ' ') || 'Symposium 2026 Report';
+        renderPDF(data, true, pdfTitle);
+      } catch (err) {
+        updateStatus("auto‑fetch failed. use menu.", false, false);
+        buildMinimalWithCovers('Sample Document', true);
+      }
     }
-}
 
-// KEYBOARD ARROWS
-document.addEventListener('keydown', (e) => {
-    if (e.key === "ArrowRight") {
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      updateStatus("reading file...", false, true);
+      const reader = new FileReader();
+      reader.onload = function(ev) { 
+        let title = file.name.replace('.pdf', '').replace(/_/g, ' ');
+        renderPDF(ev.target.result, true, title);
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    document.getElementById('pdfSelect').addEventListener('change', (e) => {
+      if (e.target.value) {
+        let selected = e.target.value;
+        let title = selected.includes('Applied') ? 'Applied Math Materials' : 'Symposium 2026 Report';
+        autoFetchPDF(selected, title);
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === "ArrowRight") {
         if (currentPagePair < pages.length - 1) flipToPage(currentPagePair + 1);
-    } else if (e.key === "ArrowLeft") {
+      } else if (e.key === "ArrowLeft") {
         if (currentPagePair >= 0) flipToPage(currentPagePair - 1);
+      }
+    });
+
+    let pages = [];
+    let currentPagePair = -1;
+    let pdfDocRef = null;
+
+    function createFrontCoverFace(titleText) {
+      const face = document.createElement('div');
+      face.className = 'page-face front';
+      face.style.background = 'linear-gradient(145deg, #cbd5e1, #e2e8f0)';
+      face.style.flexDirection = 'column';
+      face.innerHTML = `
+        <div style="font-size: 12px; letter-spacing: 4px; color: #1e3a8a; margin-bottom: 20px;">DIGITAL ARCHIVE</div>
+        <div style="font-size: 32px; font-weight: 800; color: #0f172a; text-align: center; line-height: 1.2;">${titleText}</div>
+        <div style="margin-top: 30px; font-size: 16px; color: #334155;">interactive 3D book</div>
+        <div style="margin-top: 40px; font-size: 12px; color: #475569;">prepared by<br>Editorial Team</div>
+      `;
+      return face;
     }
-});
 
-// MANUAL PICKERS
-document.getElementById('fileInput').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function() { renderPDF(this.result); };
-    reader.readAsArrayBuffer(file);
-});
+    function createBackCoverFace() {
+      const face = document.createElement('div');
+      face.className = 'page-face back';
+      face.style.background = '#334155';
+      face.style.color = '#f1f5f9';
+      face.style.flexDirection = 'column';
+      face.innerHTML = `
+        <div style="font-size: 24px; font-weight: 300; margin-bottom: 30px;">✧ 2026 ✧</div>
+        <div style="font-size: 18px; font-style: italic; max-width: 80%; text-align: center; border-bottom: 1px solid #94a3b8; padding-bottom: 20px;">“Knowledge unfolds in layers — flip through the future.”</div>
+        <div style="margin-top: 40px; font-size: 12px;">4th Symposium · Pro Binder</div>
+      `;
+      return face;
+    }
 
-document.getElementById('pdfSelect').addEventListener('change', (e) => {
-    if (e.target.value) autoFetchPDF(e.target.value);
-});
+    function buildMinimalWithCovers(title = 'Document', isFallback = false) {
+      bookContainer.innerHTML = '';
+      pages = [];
+      currentPagePair = -1;
 
-let pages = [];
-let currentPagePair = -1;
+      const frontPage = document.createElement('div');
+      frontPage.className = 'page';
+      frontPage.style.zIndex = 10;
+      const frontFace = createFrontCoverFace(title);
+      const blankBack = document.createElement('div');
+      blankBack.className = 'page-face back';
+      blankBack.style.background = '#d1d9e6';
+      frontPage.appendChild(frontFace);
+      frontPage.appendChild(blankBack);
+      frontPage.onclick = () => flipToPage(0);
+      bookContainer.appendChild(frontPage);
+      pages.push(frontPage);
 
-async function renderPDF(data) {
-    try {
-        updateStatus("Opening Report...");
-        const pdf = await pdfjsLib.getDocument({data: data}).promise;
+      const backPage = document.createElement('div');
+      backPage.className = 'page';
+      backPage.style.zIndex = 9;
+      const innerFront = document.createElement('div');
+      innerFront.className = 'page-face front';
+      innerFront.style.background = '#eef2f6';
+      innerFront.innerHTML = '<div style="padding:20px; color:#334155;">end matter</div>';
+      const backFace = createBackCoverFace();
+      backPage.appendChild(innerFront);
+      backPage.appendChild(backFace);
+      backPage.onclick = () => flipToPage(1);
+      bookContainer.appendChild(backPage);
+      pages.push(backPage);
+
+      flipToPage(-1);
+      if (isFallback) {
+        updateStatus("covers displayed (no PDF)", false, false);
+      }
+    }
+
+    async function renderPDF(data, triggerSuccess = false, docTitle = 'Symposium 2026') {
+      try {
+        updateStatus("Opening PDF ...", false, true);
+        const pdf = await pdfjsLib.getDocument({ data }).promise;
+        pdfDocRef = pdf;
+        
+        updateStatus("✅ Loaded!", true, false);
+        pageLabel.innerText = `p.1-1 / ${pdf.numPages}`;
+
         bookContainer.innerHTML = '';
         pages = [];
-        currentPagePair = -1;
+
+        const frontCoverPage = document.createElement('div');
+        frontCoverPage.className = 'page';
+        frontCoverPage.style.zIndex = pdf.numPages + 10;
+        const frontFace = createFrontCoverFace(docTitle);
+        const dummyBack1 = document.createElement('div');
+        dummyBack1.className = 'page-face back';
+        dummyBack1.style.background = '#e9edf2';
+        frontCoverPage.appendChild(frontFace);
+        frontCoverPage.appendChild(dummyBack1);
+        frontCoverPage.onclick = () => flipToPage(0);
+        bookContainer.appendChild(frontCoverPage);
+        pages.push(frontCoverPage);
 
         for (let i = 1; i <= pdf.numPages; i += 2) {
-            const pageEl = document.createElement('div');
-            pageEl.className = 'page';
-            pageEl.style.zIndex = pdf.numPages - i;
-            const front = await createFace(pdf, i, 'front');
-            const back = (i + 1 <= pdf.numPages) ? await createFace(pdf, i + 1, 'back') : createBlankBack();
-            pageEl.appendChild(front);
-            pageEl.appendChild(back);
-            const idx = pages.length;
-            pageEl.onclick = () => flipToPage(idx);
-            bookContainer.appendChild(pageEl);
-            pages.push(pageEl);
+          const pageEl = document.createElement('div');
+          pageEl.className = 'page';
+          pageEl.style.zIndex = pdf.numPages - i + 5;
+
+          const front = await createFace(pdf, i, 'front');
+          const back = (i + 1 <= pdf.numPages) ? await createFace(pdf, i + 1, 'back') : createBlankBack();
+
+          pageEl.appendChild(front);
+          pageEl.appendChild(back);
+          const idx = pages.length;
+          pageEl.onclick = () => flipToPage(idx);
+          bookContainer.appendChild(pageEl);
+          pages.push(pageEl);
         }
-        updateStatus("Success! Use Mouse or Arrows.");
-    } catch (err) {
-        updateStatus("Error: " + err.message);
+
+        const backCoverPage = document.createElement('div');
+        backCoverPage.className = 'page';
+        backCoverPage.style.zIndex = 1;
+        const insideFront = document.createElement('div');
+        insideFront.className = 'page-face front';
+        insideFront.style.background = '#eef2f6';
+        insideFront.innerHTML = '<div style="padding:20px; color:#334155;font-size:12px;">◀ colophon</div>';
+        const backFace = createBackCoverFace();
+        backCoverPage.appendChild(insideFront);
+        backCoverPage.appendChild(backFace);
+        backCoverPage.onclick = () => flipToPage(pages.length);
+        bookContainer.appendChild(backCoverPage);
+        pages.push(backCoverPage);
+
+        flipToPage(-1);
+        updatePageLabel(pdf.numPages);
+      } catch (err) {
+        updateStatus("Error: " + err.message, false, false);
+        buildMinimalWithCovers('Error fallback', true);
+      }
     }
-}
 
-async function createFace(pdf, num, type) {
-    const face = document.createElement('div');
-    face.className = 'page-face ' + type;
-    const canvas = document.createElement('canvas');
-    const page = await pdf.getPage(num);
-    const viewport = page.getViewport({ scale: 1.5 });
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-    await page.render({canvasContext: canvas.getContext('2d'), viewport: viewport}).promise;
-    face.appendChild(canvas);
-    return face;
-}
+    function updatePageLabel(totalPages) {
+      if (pdfDocRef) {
+        let right = currentPagePair === -1 ? 1 : (currentPagePair * 2 + 1);
+        let left = right - 1;
+        if (currentPagePair === -1) left = 1;
+        pageLabel.innerText = `p.${left}-${Math.min(right, totalPages)} / ${totalPages}`;
+      } else if (pages.length > 0) {
+        if (currentPagePair === -1) pageLabel.innerText = 'p.1-1/2';
+        else if (currentPagePair === 0) pageLabel.innerText = 'p.1-1/2';
+        else if (currentPagePair === 1) pageLabel.innerText = 'p.2-2/2';
+      }
+    }
 
-function createBlankBack() {
-    const face = document.createElement('div');
-    face.className = 'page-face back';
-    face.style.background = '#f1f5f9';
-    return face;
-}
+    async function createFace(pdf, num, type) {
+      const face = document.createElement('div');
+      face.className = 'page-face ' + type;
+      const canvas = document.createElement('canvas');
+      try {
+        const page = await pdf.getPage(num);
+        const viewport = page.getViewport({ scale: 1.3 });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      } catch (e) {
+        canvas.style.background = '#f1f5f9';
+      }
+      face.appendChild(canvas);
+      return face;
+    }
 
-function flipToPage(index) {
-    if (flipSound) { flipSound.currentTime = 0; flipSound.play().catch(() => {}); }
-    pages.forEach((p, i) => {
+    function createBlankBack() {
+      const face = document.createElement('div');
+      face.className = 'page-face back';
+      face.style.background = '#f1f5f9';
+      return face;
+    }
+
+    function flipToPage(index) {
+      if (flipSound) { 
+        flipSound.currentTime = 0; 
+        flipSound.play().catch(() => {}); 
+      }
+      pages.forEach((p, i) => {
         if (i <= index) {
-            p.classList.add('flipped');
-            p.style.zIndex = 100 + i;
+          p.classList.add('flipped');
+          p.style.zIndex = 100 + i;
         } else {
-            p.classList.remove('flipped');
-            p.style.zIndex = pages.length - i;
+          p.classList.remove('flipped');
+          p.style.zIndex = pages.length - i;
         }
-    });
-    currentPagePair = index;
-}
+      });
+      currentPagePair = index;
+      if (pdfDocRef) {
+        let total = pdfDocRef.numPages;
+        let right = index === -1 ? 1 : (index * 2 + 1);
+        let left = right - 1;
+        if (index === -1) left = 1;
+        pageLabel.innerText = `p.${left}-${Math.min(right, total)} / ${total}`;
+      } else {
+        if (index === -1) pageLabel.innerText = 'p.1-1/2';
+        else if (index === 0) pageLabel.innerText = 'p.1-1/2';
+        else if (index === 1) pageLabel.innerText = 'p.2-2/2';
+      }
+    }
 
-document.getElementById('nextBtn').onclick = () => { if (currentPagePair < pages.length - 1) flipToPage(currentPagePair + 1); };
-document.getElementById('prevBtn').onclick = () => { if (currentPagePair >= 0) flipToPage(currentPagePair - 1); };
-</script>
+    document.getElementById('nextBtn').onclick = () => { if (currentPagePair < pages.length - 1) flipToPage(currentPagePair + 1); };
+    document.getElementById('prevBtn').onclick = () => { if (currentPagePair >= 0) flipToPage(currentPagePair - 1); };
+
+    buildMinimalWithCovers('Symposium 2026', false);
+  </script>
 </body>
 </html>
