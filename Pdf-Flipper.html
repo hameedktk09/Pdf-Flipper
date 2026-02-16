@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>3D Pro-Binder | 4th Symposium 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<style>
+    :root {
+        --book-width: 400px;
+        --book-height: 550px;
+        --bg-color: #ffffff;      
+        --binder-color: #e2e8f0;  
+        --spine-color: #1e3a8a;   
+        --inner-gap: 8px;
+        --page-speed: 0.8s;
+    }
+
+    body {
+        background-color: var(--bg-color);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        font-family: sans-serif;
+        overflow: hidden;
+    }
+
+    .hardcover {
+        position: relative;
+        width: calc((var(--book-width) * 2) + var(--inner-gap) + 40px);
+        height: calc(var(--book-height) + 30px);
+        background: var(--binder-color);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+        perspective: 2500px;
+    }
+
+    /* BOLD BLUE LINE - MATCHES BOOK HEIGHT */
+    .spine-ridge {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 14px;
+        height: var(--book-height); 
+        background: var(--spine-color);
+        z-index: 40;
+        box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+    }
+
+    .book-wrapper {
+        position: relative;
+        width: calc((var(--book-width) * 2) + var(--inner-gap));
+        height: var(--book-height);
+        transform-style: preserve-3d;
+        z-index: 10;
+    }
+
+    .page {
+        position: absolute;
+        width: var(--book-width);
+        height: var(--book-height);
+        right: 0;
+        transform-origin: left center;
+        transform-style: preserve-3d;
+        transition: transform var(--page-speed) cubic-bezier(0.645, 0.045, 0.355, 1);
+        cursor: pointer;
+    }
+
+    .page-face {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background: white;
+        backface-visibility: hidden;
+        border: 1px solid #ddd;
+    }
+
+    .back { transform: rotateY(180deg); background: #f8fafc; }
+    .page.flipped { transform: rotateY(-180deg) translateX(calc(var(--inner-gap) * -1)); }
+
+    canvas { width: 100%; height: 100%; display: block; }
+
+    /* HOVER-TO-REVEAL DRAWER - Fixed Rollback */
+    #controls {
+        position: absolute;
+        top: 0;
+        left: 20px;
+        z-index: 9000;
+        background: white;
+        padding: 8px 12px;
+        border-radius: 0 0 8px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        border: 1px solid #cbd5e1;
+        border-top: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        width: 210px;
+        transition: transform 0.4s ease-in-out;
+        transform: translateY(-78%); /* Rolled up: only label visible */
+    }
+
+    #controls:hover {
+        transform: translateY(0); /* Rolled down: full menu visible */
+    }
+
+    .nav-btn {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--spine-color);
+        color: white;
+        border: none;
+        width: 45px;
+        height: 80px;
+        cursor: pointer;
+        z-index: 8000;
+        font-size: 30px;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.8;
+        transition: opacity 0.3s;
+    }
+    
+    #prevBtn { left: -60px; }
+    #nextBtn { right: -60px; }
+
+    #status-msg {
+        position: fixed;
+        bottom: 10px;
+        font-size: 11px;
+        color: #94a3b8;
+    }
+</style>
+</head>
+<body>
+
+<div id="status-msg">Status: Checking for PDF in folder...</div>
+
+<div class="hardcover">
+    <div id="controls">
+        <label style="font-size: 11px; font-weight: bold; color: #1e3a8a; cursor: pointer; text-align: center;">▼ SELECT DOCUMENT</label>
+        <select id="pdfSelect" style="font-size: 11px; padding: 4px;">
+            <option value="report.pdf">4th Symposium 2026 Report</option>
+            <option value="https://raw.githubusercontent.com/hameedktk09/Pdf-Flipper/main/Applied%20Math%20Study%20Materials%202024-25.pdf">Online Backup Link</option>
+        </select>
+        <input type="file" id="fileInput" accept="application/pdf" style="font-size: 9px;">
+    </div>
+
+    <button class="nav-btn" id="prevBtn">&#10094;</button>
+    <button class="nav-btn" id="nextBtn">&#10095;</button>
+    
+    <div class="spine-ridge"></div>
+    
+    <div class="book-wrapper">
+        <div id="book-pages" style="transform-style: preserve-3d;"></div>
+    </div>
+</div>
+
+<audio id="flipSound" src="adainpto.wav" preload="auto"></audio>
+
+<script>
+const pdfjsLib = window['pdfjs-dist/build/pdf'];
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+const bookContainer = document.getElementById('book-pages');
+const statusMsg = document.getElementById('status-msg');
+const flipSound = document.getElementById('flipSound');
+
+function updateStatus(text) {
+    statusMsg.innerText = "Status: " + text;
+}
+
+// AUTO-FETCH ATTEMPT ON LOAD
+window.onload = () => {
+    // Try to load 'report.pdf' automatically from your folder
+    autoFetchPDF('report.pdf');
+};
+
+async function autoFetchPDF(url) {
+    updateStatus("Searching for " + url + "...");
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("File not found in folder");
+        const data = await response.arrayBuffer();
+        renderPDF(data);
+    } catch (err) {
+        updateStatus("Could not auto-fetch. Please use 'Select Document' menu.");
+    }
+}
+
+// KEYBOARD ARROWS
+document.addEventListener('keydown', (e) => {
+    if (e.key === "ArrowRight") {
+        if (currentPagePair < pages.length - 1) flipToPage(currentPagePair + 1);
+    } else if (e.key === "ArrowLeft") {
+        if (currentPagePair >= 0) flipToPage(currentPagePair - 1);
+    }
+});
+
+// MANUAL PICKERS
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function() { renderPDF(this.result); };
+    reader.readAsArrayBuffer(file);
+});
+
+document.getElementById('pdfSelect').addEventListener('change', (e) => {
+    if (e.target.value) autoFetchPDF(e.target.value);
+});
+
+let pages = [];
+let currentPagePair = -1;
+
+async function renderPDF(data) {
+    try {
+        updateStatus("Opening Report...");
+        const pdf = await pdfjsLib.getDocument({data: data}).promise;
+        bookContainer.innerHTML = '';
+        pages = [];
+        currentPagePair = -1;
+
+        for (let i = 1; i <= pdf.numPages; i += 2) {
+            const pageEl = document.createElement('div');
+            pageEl.className = 'page';
+            pageEl.style.zIndex = pdf.numPages - i;
+            const front = await createFace(pdf, i, 'front');
+            const back = (i + 1 <= pdf.numPages) ? await createFace(pdf, i + 1, 'back') : createBlankBack();
+            pageEl.appendChild(front);
+            pageEl.appendChild(back);
+            const idx = pages.length;
+            pageEl.onclick = () => flipToPage(idx);
+            bookContainer.appendChild(pageEl);
+            pages.push(pageEl);
+        }
+        updateStatus("Success! Use Mouse or Arrows.");
+    } catch (err) {
+        updateStatus("Error: " + err.message);
+    }
+}
+
+async function createFace(pdf, num, type) {
+    const face = document.createElement('div');
+    face.className = 'page-face ' + type;
+    const canvas = document.createElement('canvas');
+    const page = await pdf.getPage(num);
+    const viewport = page.getViewport({ scale: 1.5 });
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    await page.render({canvasContext: canvas.getContext('2d'), viewport: viewport}).promise;
+    face.appendChild(canvas);
+    return face;
+}
+
+function createBlankBack() {
+    const face = document.createElement('div');
+    face.className = 'page-face back';
+    face.style.background = '#f1f5f9';
+    return face;
+}
+
+function flipToPage(index) {
+    if (flipSound) { flipSound.currentTime = 0; flipSound.play().catch(() => {}); }
+    pages.forEach((p, i) => {
+        if (i <= index) {
+            p.classList.add('flipped');
+            p.style.zIndex = 100 + i;
+        } else {
+            p.classList.remove('flipped');
+            p.style.zIndex = pages.length - i;
+        }
+    });
+    currentPagePair = index;
+}
+
+document.getElementById('nextBtn').onclick = () => { if (currentPagePair < pages.length - 1) flipToPage(currentPagePair + 1); };
+document.getElementById('prevBtn').onclick = () => { if (currentPagePair >= 0) flipToPage(currentPagePair - 1); };
+</script>
+</body>
+</html>
