@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D PDF Flipper · Unified</title>
+  <title>3D PDF Flipper · ASU</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <style>
     :root {
@@ -350,7 +350,7 @@
     </div>
   </div>
 
-  <div id="status-msg">📄 Status: scanning for PDFs...</div>
+  <div id="status-msg">📄 Status: loading from ASU link...</div>
 
   <div class="hardcover">
     <button class="nav-btn" id="prevBtn">&#10094;</button>
@@ -385,6 +385,9 @@
 
     document.getElementById('year').textContent = new Date().getFullYear();
 
+    // The ASU link to load automatically
+    const ASU_PDF_LINK = 'http://dms.asu.edu.om/share/s/FWWnH6vaQL6EdMTZYt46jQ';
+
     let discoveredPDFs = [];
     let usingSamplePages = false;
 
@@ -402,6 +405,27 @@
         readyLight.className = 'status-light';
         bodyEl.classList.remove('success-glow');
         if (!pdfDocRef && !usingSamplePages) pageLabel.innerText = "p.1-1/0";
+      }
+    }
+
+    // Function to load the ASU PDF
+    async function loadASUPDF() {
+      updateStatus("fetching PDF from ASU link...", false, true);
+      try {
+        // Using a proxy to avoid CORS issues - this is a public CORS proxy
+        const proxyUrl = 'https://api.allorigins.win/raw?url=';
+        const targetUrl = encodeURIComponent(ASU_PDF_LINK);
+        
+        const response = await fetch(proxyUrl + targetUrl);
+        if (!response.ok) throw new Error("Failed to load PDF from ASU");
+        
+        const data = await response.arrayBuffer();
+        renderPDF(data, true, 'ASU Document');
+      } catch (err) {
+        console.error("Error loading ASU PDF:", err);
+        updateStatus("ASU link failed, scanning folder...", false, false);
+        // Fall back to folder scan
+        scanFolderForPDFs();
       }
     }
 
@@ -436,6 +460,7 @@
           updateStatus("no PDFs found, showing sample pages", false, false);
           pdfSelect.innerHTML = `
             <option value="sample">📁 Sample Pages (Preview)</option>
+            <option value="${ASU_PDF_LINK}">🌐 ASU Document</option>
             <option value="https://raw.githubusercontent.com/hameedktk09/Pdf-Flipper/main/Applied%20Math%20Study%20Materials%202024-25.pdf">🌐 Online Backup</option>
           `;
           buildSamplePages();
@@ -444,6 +469,7 @@
         updateStatus("folder scan failed, showing samples", false, false);
         pdfSelect.innerHTML = `
           <option value="sample">📁 Sample Pages (Preview)</option>
+          <option value="${ASU_PDF_LINK}">🌐 ASU Document</option>
           <option value="https://raw.githubusercontent.com/hameedktk09/Pdf-Flipper/main/Applied%20Math%20Study%20Materials%202024-25.pdf">🌐 Online Backup</option>
         `;
         buildSamplePages();
@@ -459,6 +485,12 @@
         option.textContent = `📁 ${displayName}`;
         pdfSelect.appendChild(option);
       });
+      // Add ASU link as an option
+      const asuOption = document.createElement('option');
+      asuOption.value = ASU_PDF_LINK;
+      asuOption.textContent = '🌐 ASU Document';
+      pdfSelect.appendChild(asuOption);
+      
       const onlineOption = document.createElement('option');
       onlineOption.value = 'https://raw.githubusercontent.com/hameedktk09/Pdf-Flipper/main/Applied%20Math%20Study%20Materials%202024-25.pdf';
       onlineOption.textContent = '🌐 Online Backup';
@@ -484,6 +516,7 @@
         if (e.target.value === 'sample') {
           buildSamplePages();
         } else if (e.target.value.startsWith('http')) {
+          // Handle both ASU link and other online PDFs
           autoFetchPDF(e.target.value);
         } else {
           loadPDFFromFile(e.target.value);
@@ -494,12 +527,18 @@
     async function autoFetchPDF(url, customTitle = '') {
       updateStatus("loading online PDF...", false, true);
       try {
-        const response = await fetch(url);
+        // Use proxy for external URLs to avoid CORS
+        const proxyUrl = 'https://api.allorigins.win/raw?url=';
+        const targetUrl = encodeURIComponent(url);
+        
+        const response = await fetch(proxyUrl + targetUrl);
         if (!response.ok) throw new Error("Failed to load");
+        
         const data = await response.arrayBuffer();
-        let pdfTitle = customTitle || 'Online Document';
+        let pdfTitle = customTitle || (url.includes('asu') ? 'ASU Document' : 'Online Document');
         renderPDF(data, true, pdfTitle);
       } catch (err) {
+        console.error("Error loading online PDF:", err);
         updateStatus("online fetch failed", false, false);
         buildSamplePages();
       }
@@ -562,7 +601,7 @@
     // Front matters - will appear on the back of front cover
     function createFrontMattersFace() {
       const face = document.createElement('div');
-      face.className = 'page-face back cover-page'; // Important: this is the BACK face of front cover page
+      face.className = 'page-face back cover-page';
       face.style.flexDirection = 'column';
       face.style.justifyContent = 'center';
       face.style.alignItems = 'center';
@@ -577,7 +616,7 @@
     // Back cover matters - will appear on the front face of back cover page
     function createBackMattersFace() {
       const face = document.createElement('div');
-      face.className = 'page-face front cover-page'; // This is the FRONT face of back cover page
+      face.className = 'page-face front cover-page';
       face.style.flexDirection = 'column';
       face.style.justifyContent = 'center';
       face.style.alignItems = 'center';
@@ -627,8 +666,8 @@
       frontPage.className = 'page';
       frontPage.style.zIndex = 10;
       const frontCover = createFrontCoverFace('Sample PDF');
-      const frontMatters = createFrontMattersFace(); // This will be the back face
-      frontMatters.classList.add('back'); // Explicitly set as back face
+      const frontMatters = createFrontMattersFace();
+      frontMatters.classList.add('back');
       frontPage.appendChild(frontCover);
       frontPage.appendChild(frontMatters);
       frontPage.onclick = () => flipToPage(0);
@@ -653,9 +692,9 @@
       const backPage = document.createElement('div');
       backPage.className = 'page';
       backPage.style.zIndex = 6;
-      const backMatters = createBackMattersFace(); // This will be the front face
-      backMatters.classList.add('front'); // Explicitly set as front face
-      const backCover = createBackCoverFace(); // This will be the back face
+      const backMatters = createBackMattersFace();
+      backMatters.classList.add('front');
+      const backCover = createBackCoverFace();
       backCover.classList.add('back');
       backPage.appendChild(backMatters);
       backPage.appendChild(backCover);
@@ -663,13 +702,12 @@
       bookContainer.appendChild(backPage);
       pages.push(backPage);
 
-      // Start with no pages flipped (front cover visible)
       flipToPage(-1);
-      updateStatus("sample pages ready - back matters visible on last page", false, false);
+      updateStatus("sample pages ready", false, false);
       pageLabel.innerText = "p.1-2 / 3";
     }
 
-    async function renderPDF(data, triggerSuccess = false, docTitle = 'Sample PDF') {
+    async function renderPDF(data, triggerSuccess = false, docTitle = 'ASU Document') {
       try {
         usingSamplePages = false;
         updateStatus("Rendering PDF...", false, true);
@@ -800,7 +838,8 @@
     document.getElementById('nextBtn').onclick = () => { if (currentPagePair < pages.length - 1) flipToPage(currentPagePair + 1); };
     document.getElementById('prevBtn').onclick = () => { if (currentPagePair >= 0) flipToPage(currentPagePair - 1); };
 
-    scanFolderForPDFs();
+    // Start by loading the ASU PDF
+    loadASUPDF();
   </script>
 </body>
 </html>
