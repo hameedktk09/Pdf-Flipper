@@ -2,844 +2,643 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D PDF Flipper · ASU</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>3D PDF Flipper · ASU Edition</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <style>
+    /* modern reset & variables */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     :root {
-      --book-width: 400px;
-      --book-height: 550px;
-      --bg-color: #ffffff;      
-      --binder-color: #e2e8f0;  
-      --spine-color: #1e3a8a;   
+      --book-width: 480px;          
+      --book-height: 680px;         
+      --bg-color: #f8fafc;
+      --spine-color: #1e3a8a;
       --inner-gap: 8px;
-      --page-speed: 0.8s;
-      --success-glow: #ecfccb;
-      --cover-bg: #f8f4e9;      /* unified warm light tone */
-      --panel-bg: #2d2f31;
-      --accent: #a3e635;
+      --page-speed: 0.7s;
+      --cover-bg: #f8f4e9;
       --button-blue: #1e3a8a;
-      --button-hover: #2563eb;
+      --text-color: #0f172a;
+      --accent: #a3e635;
+      --panel-bg: rgba(255,255,255,0.85);
+      --border-color: rgba(0,0,0,0.1);
+    }
+
+    body.dark-mode {
+      --bg-color: #0f172a;
+      --spine-color: #334155;
+      --cover-bg: #2d2f31;
+      --text-color: #f1f5f9;
+      --panel-bg: rgba(30,41,59,0.85);
+      --border-color: rgba(255,255,255,0.1);
     }
 
     body {
       background-color: var(--bg-color);
       display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      transition: background-color 0.4s;
+    }
+
+    .app-container {
+      display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      width: 100%;
       height: 100vh;
-      margin: 0;
-      font-family: 'Inter', system-ui, sans-serif;
-      overflow: hidden;
-      transition: background-color 0.3s ease;
+      padding: 0.2rem;
     }
 
-    body.success-glow {
-      background-color: #f1f9e6;
-      box-shadow: inset 0 0 40px #d9f0b2;
-    }
-
-    /* ---- EXTRA COMPACT FLAT BUTTON BAR ---- */
-    .master-bar {
-      position: absolute;
-      top: 6px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 20000;
-      display: flex;
-      gap: 4px;
-      background: white;
-      padding: 3px 8px;
-      border-radius: 30px;
-      border: 1px solid #cbd5e1;
-      align-items: center;
-      backdrop-filter: blur(4px);
-      background: rgba(255,255,255,0.98);
-      font-size: 11px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-    }
-
-    .bar-section {
+    /* TOP TRAY - Tightened to 4px to bring book almost touching */
+    .tray-top {
+      margin-bottom: 4px; 
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 8px;
+      z-index: 1000;
+      background: var(--panel-bg);
+      padding: 6px 15px;
+      border-radius: 40px;
+      border: 1px solid var(--border-color);
+      backdrop-filter: blur(12px);
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 98vw;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     }
 
-    .divider {
-      width: 1px;
-      height: 18px;
-      background: #cbd5e1;
-      margin: 0 2px;
+    /* BOTTOM TRAY - Increased margin to push away from the book */
+    .tray-bottom {
+      margin-top: 25px; 
+      z-index: 100;
+      color: var(--text-color);
+      font-size: 12px;
+      background: var(--panel-bg);
+      padding: 4px 20px;
+      border-radius: 40px;
+      border: 1px solid var(--border-color);
+      backdrop-filter: blur(12px);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-weight: 500;
     }
 
-    .master-bar select {
-      font-size: 10px;
-      padding: 3px 6px;
-      border-radius: 20px;
-      border: 1px solid #94a3b8;
-      background: #f8fafc;
-      cursor: pointer;
-      outline: none;
-      height: 24px;
+    .tray-bottom a {
+      color: var(--spine-color);
+      text-decoration: none;
+      font-weight: 600;
     }
+    body.dark-mode .tray-bottom a { color: #7aa9ff; }
 
-    .master-bar .file-label,
-    .master-bar button.tool-btn {
+    .separator { opacity: 0.4; font-weight: 300; }
+
+    /* Unified consistent button sizes */
+    .tray-btn, .file-label, select, .tray-input {
       background: var(--button-blue);
       color: white;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 10px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.2s;
       border: none;
-      display: inline-block;
-      line-height: normal;
-      height: 24px;
-      display: flex;
+      padding: 0 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      display: inline-flex;
       align-items: center;
-    }
-
-    .master-bar .file-label:hover,
-    .master-bar button.tool-btn:hover {
-      background: var(--button-hover);
-    }
-
-    #fileInput {
-      display: none;
-    }
-
-    .status-group {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      background: #f1f4f9;
-      padding: 2px 8px;
-      border-radius: 30px;
-      font-size: 10px;
-      color: #0f172a;
+      justify-content: center;
+      height: 30px;
+      transition: 0.15s;
       white-space: nowrap;
-      height: 24px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .tray-btn:hover, .file-label:hover {
+      background: #2563eb;
+      transform: translateY(-1px);
+    }
+
+    select {
+      background: white;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+      width: 160px;
+      appearance: none;
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%23333" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>');
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      padding-right: 25px;
+    }
+    body.dark-mode select { background-color: #1e293b; color: white; border-color: #475569; }
+
+    .tray-input {
+      width: 60px;
+      border: 1px solid #cbd5e1;
+      background: white;
+      color: #0f172a;
+      text-align: center;
+    }
+    body.dark-mode .tray-input { background: #1e293b; color: white; border-color: #475569; }
+
+    .status-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-color);
+      background: rgba(0,0,0,0.05);
+      padding: 0 10px;
+      border-radius: 6px;
+      height: 30px;
+      border: 1px solid var(--border-color);
     }
 
     .status-light {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: #3f3f46;
-      transition: all 0.4s ease;
+      background: #94a3b8;
     }
-
-    .status-light.loading {
-      background: #fbbf24;
-      box-shadow: 0 0 8px #fbbf24;
-      animation: pulse 1s infinite;
-    }
-
     .status-light.active {
       background: var(--accent);
       box-shadow: 0 0 8px var(--accent);
     }
 
-    @keyframes pulse {
-      0% { opacity: 1; }
-      50% { opacity: 0.5; }
-      100% { opacity: 1; }
-    }
-
-    .hardcover {
-      position: relative;
-      width: calc((var(--book-width) * 2) + var(--inner-gap) + 40px);
-      height: calc(var(--book-height) + 30px);
-      background: var(--binder-color);
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.1);
-      perspective: 2500px;
-    }
-
-    .spine-ridge {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 14px;
-      height: var(--book-height); 
-      background: var(--spine-color);
-      z-index: 40;
-      box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
-    }
-
-    .book-wrapper {
+    /* BOOK container */
+    .book-container {
       position: relative;
       width: calc((var(--book-width) * 2) + var(--inner-gap));
       height: var(--book-height);
+      perspective: 2800px;
+      margin: 0 auto; 
+    }
+
+    .cover-spine {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 16px;
+      top: 0;
+      height: 104%;
+      background: var(--spine-color);
+      z-index: 45;
+      border-radius: 1px; 
+      box-shadow: 0 0 20px rgba(0,0,0,0.2);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+    
+    .cover-spine::before, .cover-spine::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: repeating-linear-gradient(90deg, #fff, #fff 2px, var(--accent) 2px, var(--accent) 4px);
+      opacity: 0.7;
+    }
+    .cover-spine::before { top: 0; }
+    .cover-spine::after { bottom: 0; }
+    .cover-spine.visible { opacity: 1; }
+
+    .book-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
       transform-style: preserve-3d;
-      z-index: 10;
     }
 
     .page {
       position: absolute;
       width: var(--book-width);
       height: var(--book-height);
-      right: 0;
+      right: 0;                
       transform-origin: left center;
       transform-style: preserve-3d;
-      transition: transform var(--page-speed) cubic-bezier(0.645, 0.045, 0.355, 1);
+      transition: transform var(--page-speed) cubic-bezier(0.23, 1, 0.32, 1);
       cursor: pointer;
+      box-shadow: 
+        0 1px 1px rgba(0,0,0,0.1),
+        1px 1px 1px rgba(0,0,0,0.05),
+        2px 2px 1px rgba(0,0,0,0.05);
     }
 
     .page-face {
       position: absolute;
       width: 100%;
       height: 100%;
-      background: white;
       backface-visibility: hidden;
-      border: 1px solid #ddd;
+      background: white;
+      border: 1px solid #e2e8f0;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      flex-direction: column;
-      padding: 20px;
       box-sizing: border-box;
+      border-radius: 2px 8px 8px 2px;
     }
 
     .back { transform: rotateY(180deg); }
-    .page.flipped { transform: rotateY(-180deg) translateX(calc(var(--inner-gap) * -1)); }
-
-    canvas { width: 100%; height: 100%; display: block; object-fit: contain; }
-    .cover-image { max-width: 100%; max-height: 100%; object-fit: contain; }
-
-    /* Unified cover styling */
-    .cover-page {
-      background: var(--cover-bg) !important;
-      color: #1e293b;
+    .page.flipped {
+      transform: rotateY(-180deg) translateX(calc(var(--inner-gap) * -1));
     }
 
-    /* Sample page styling */
-    .sample-page {
-      background: #ffffff;
-      background-image: 
-        linear-gradient(#e2e8f0 1px, transparent 1px),
-        linear-gradient(90deg, #e2e8f0 1px, transparent 1px);
-      background-size: 30px 30px;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-      align-items: flex-start;
-      padding: 40px 30px;
+    .cover-page {
+      background: var(--cover-bg) !important;
+      color: var(--text-color);
+      border: 1px solid #cbd5e1;
       font-family: 'Georgia', serif;
     }
 
-    .sample-page h2 {
-      color: #1e3a8a;
-      border-bottom: 2px solid #1e3a8a;
-      padding-bottom: 8px;
-      margin-bottom: 20px;
-      font-size: 24px;
-    }
+    .inner-page { background: white !important; }
 
-    .sample-page p {
-      color: #334155;
-      line-height: 1.6;
-      margin-bottom: 15px;
-      font-size: 14px;
-    }
-
-    .sample-page .page-number {
-      align-self: flex-end;
-      margin-top: auto;
-      color: #64748b;
-      font-size: 12px;
-    }
-
-    .nav-btn {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      background: var(--spine-color);
-      color: white;
-      border: none;
-      width: 45px;
-      height: 80px;
-      cursor: pointer;
-      z-index: 8000;
-      font-size: 30px;
-      border-radius: 5px;
+    .preview-cover {
+      background: var(--cover-bg);
       display: flex;
-      align-items: center;
+      flex-direction: column;
       justify-content: center;
-      opacity: 0.8;
-      transition: opacity 0.3s;
+      align-items: center;
     }
-    
-    #prevBtn { left: -60px; }
-    #nextBtn { right: -60px; }
-
-    #status-msg {
-      position: fixed;
-      bottom: 50px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 11px;
-      background: rgba(30, 58, 138, 0.2);
-      backdrop-filter: blur(4px);
-      padding: 4px 16px;
-      border-radius: 40px;
-      color: #0f172a;
-      font-weight: 500;
-      z-index: 20000;
-    }
-
-    footer {
-      position: fixed;
-      bottom: 8px;
-      left: 0;
-      width: 100%;
-      text-align: center;
-      font-size: 10px;
-      color: #334155;
-      background: rgba(255, 255, 255, 0.7);
-      backdrop-filter: blur(4px);
-      padding: 6px 0;
-      z-index: 30000;
-      border-top: 1px solid #cbd5e1;
-      font-family: 'Inter', sans-serif;
-    }
-
-    footer a {
+    .preview-cover h1 {
       color: #1e3a8a;
-      text-decoration: none;
-      font-weight: 500;
+      font-size: 3.2rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+    }
+    .preview-cover h2 {
+      color: #334155;
+      font-size: 1.6rem;
+      font-weight: 400;
     }
 
-    footer a:hover {
-      text-decoration: underline;
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+      background: white;
     }
 
-    .copyright {
-      margin-left: 8px;
-      white-space: nowrap;
-    }
+    #fileInput { display: none; }
+    #downloadBtn { background: #059669; }
 
-    #year {
-      font-weight: 500;
+    @media (max-width: 1000px) {
+      :root {
+        --book-width: 380px;
+        --book-height: 540px;
+      }
+    }
+    @media (max-width: 680px) {
+      :root {
+        --book-width: 300px;
+        --book-height: 420px;
+      }
     }
   </style>
 </head>
 <body>
 
-  <div class="master-bar">
-    <div class="bar-section">
-      <select id="pdfSelect">
-        <!-- will be populated dynamically -->
-      </select>
-      <label for="fileInput" class="file-label">Choose File</label>
-      <input type="file" id="fileInput" accept="application/pdf">
-    </div>
-
-    <span class="divider"></span>
-
-    <div class="status-group">
-      <div id="readyLight" class="status-light"></div>
-      <span id="pageLabel" class="page-info">p.1-1/0</span>
+<div class="app-container">
+  <div class="tray-top">
+    <select id="pdfSelect"></select>
+    <label for="fileInput" class="file-label">📂 Open</label>
+    <input type="file" id="fileInput" accept="application/pdf">
+    <button class="tray-btn" id="toggleDarkMode">🌙 Dark</button>
+    <button class="tray-btn" id="toggleFullScreen">⛶ Full</button>
+    <input type="number" id="jumpToPage" class="tray-input" placeholder="Page" min="1">
+    <div class="status-box">
+      <div id="readyLight" class="status-light active"></div>
+      <span id="pageLabel">p.1-2 / 3</span>
     </div>
   </div>
 
-  <div id="status-msg">📄 Status: loading from ASU link...</div>
-
-  <div class="hardcover">
-    <button class="nav-btn" id="prevBtn">&#10094;</button>
-    <button class="nav-btn" id="nextBtn">&#10095;</button>
-    
-    <div class="spine-ridge"></div>
-    
-    <div class="book-wrapper">
-      <div id="book-pages" style="transform-style: preserve-3d;"></div>
-    </div>
+  <div class="book-container">
+    <div class="cover-spine" id="coverSpine"></div>
+    <div class="book-wrapper" id="book-pages"></div>
   </div>
 
-  <footer>
-    <a href="https://www.asu.edu.om/" target="_blank" class="univ-link">A'Sharqiyah University</a>: P.O Box 42, Postal Code:400 Ibra, Sultanate of Oman.
-    <a href="https://www.asu.edu.om/Page/Details/25?t=Centre%20for%20Language%20and%20Foundation%20Studies">Center For Language and Foundation Studies</a>.
-    <span class="copyright">&copy; <a href="mailto:hrehman08@yahoo.com">drkhan</a> <span id="year"></span></span>
-  </footer>
+  <div class="tray-bottom">
+    <span>ASU CLFS</span>
+    <span class="separator">|</span>
+    <span>© 2026</span>
+    <span class="separator">|</span>
+    <a href="mailto:hrehman08@yahoo.com">drkhan</a>
+    <span class="separator">|</span>
+    <button class="tray-btn" id="downloadBtn" style="height:22px; padding:0 8px; font-size:10px;">⬇ PDF</button>
+  </div>
+</div>
 
-  <audio id="flipSound" src="data:audio/wav;base64,UklGRlwAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YWEAAACAgICAf39/f39/f3+AgICAf39/f39/f3+AgICAf39/f39/f3+AgICAf39/f39/f3+AgICAf39/f39/f38=" preload="auto"></audio>
+<audio id="flipSound" src="https://www.soundjay.com/misc/sounds/paper-flip-1.mp3" preload="auto"></audio>
 
-  <script>
+<script>
+  (function() {
     const pdfjsLib = window['pdfjs-dist/build/pdf'];
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
     const bookContainer = document.getElementById('book-pages');
-    const statusMsg = document.getElementById('status-msg');
-    const flipSound = document.getElementById('flipSound');
-    const bodyEl = document.body;
-    const readyLight = document.getElementById('readyLight');
     const pageLabel = document.getElementById('pageLabel');
+    const readyLight = document.getElementById('readyLight');
     const pdfSelect = document.getElementById('pdfSelect');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const coverSpine = document.getElementById('coverSpine');
+    const toggleDark = document.getElementById('toggleDarkMode');
+    const toggleFull = document.getElementById('toggleFullScreen');
+    const jumpInput = document.getElementById('jumpToPage');
+    const fileInput = document.getElementById('fileInput');
+    const flipSound = document.getElementById('flipSound');
 
-    document.getElementById('year').textContent = new Date().getFullYear();
-
-    // The ASU link to load automatically
-    const ASU_PDF_LINK = 'http://dms.asu.edu.om/share/s/FWWnH6vaQL6EdMTZYt46jQ';
-
-    let discoveredPDFs = [];
-    let usingSamplePages = false;
-
-    function updateStatus(text, success = false, isLoading = false) {
-      statusMsg.innerText = "📄 " + text;
-      
-      if (isLoading) {
-        readyLight.className = 'status-light loading';
-        pageLabel.innerText = "⏳ loading";
-      } else if (success) {
-        readyLight.className = 'status-light active';
-        bodyEl.classList.add('success-glow');
-        setTimeout(() => bodyEl.classList.remove('success-glow'), 2000);
-      } else {
-        readyLight.className = 'status-light';
-        bodyEl.classList.remove('success-glow');
-        if (!pdfDocRef && !usingSamplePages) pageLabel.innerText = "p.1-1/0";
-      }
-    }
-
-    // Function to load the ASU PDF
-    async function loadASUPDF() {
-      updateStatus("fetching PDF from ASU link...", false, true);
-      try {
-        // Using a proxy to avoid CORS issues - this is a public CORS proxy
-        const proxyUrl = 'https://api.allorigins.win/raw?url=';
-        const targetUrl = encodeURIComponent(ASU_PDF_LINK);
-        
-        const response = await fetch(proxyUrl + targetUrl);
-        if (!response.ok) throw new Error("Failed to load PDF from ASU");
-        
-        const data = await response.arrayBuffer();
-        renderPDF(data, true, 'ASU Document');
-      } catch (err) {
-        console.error("Error loading ASU PDF:", err);
-        updateStatus("ASU link failed, scanning folder...", false, false);
-        // Fall back to folder scan
-        scanFolderForPDFs();
-      }
-    }
-
-    async function scanFolderForPDFs() {
-      updateStatus("scanning for PDFs...", false, true);
-      
-      try {
-        const commonPDFs = [
-          'report.pdf', 'sample.pdf', 'document.pdf', 'file.pdf', 'book.pdf', 'presentation.pdf'
-        ];
-        
-        const possiblePDFs = [];
-        
-        for (const pdfName of commonPDFs) {
-          try {
-            const response = await fetch(pdfName, { method: 'HEAD' });
-            if (response.ok) {
-              possiblePDFs.push(pdfName);
-            }
-          } catch (e) {}
-        }
-        
-        if (possiblePDFs.length > 0) {
-          discoveredPDFs = possiblePDFs;
-          updatePDFSelect(discoveredPDFs);
-          
-          if (discoveredPDFs.length > 0) {
-            updateStatus(`found ${discoveredPDFs.length} PDF(s), loading first...`, false, true);
-            await loadPDFFromFile(discoveredPDFs[0]);
-          }
-        } else {
-          updateStatus("no PDFs found, showing sample pages", false, false);
-          pdfSelect.innerHTML = `
-            <option value="sample">📁 Sample Pages (Preview)</option>
-            <option value="${ASU_PDF_LINK}">🌐 ASU Document</option>
-            <option value="https://raw.githubusercontent.com/hameedktk09/Pdf-Flipper/main/Applied%20Math%20Study%20Materials%202024-25.pdf">🌐 Online Backup</option>
-          `;
-          buildSamplePages();
-        }
-      } catch (error) {
-        updateStatus("folder scan failed, showing samples", false, false);
-        pdfSelect.innerHTML = `
-          <option value="sample">📁 Sample Pages (Preview)</option>
-          <option value="${ASU_PDF_LINK}">🌐 ASU Document</option>
-          <option value="https://raw.githubusercontent.com/hameedktk09/Pdf-Flipper/main/Applied%20Math%20Study%20Materials%202024-25.pdf">🌐 Online Backup</option>
-        `;
-        buildSamplePages();
-      }
-    }
-
-    function updatePDFSelect(pdfList) {
-      pdfSelect.innerHTML = '';
-      pdfList.forEach(pdf => {
-        const option = document.createElement('option');
-        option.value = pdf;
-        let displayName = pdf.replace('.pdf', '').replace(/_/g, ' ').replace(/-/g, ' ');
-        option.textContent = `📁 ${displayName}`;
-        pdfSelect.appendChild(option);
-      });
-      // Add ASU link as an option
-      const asuOption = document.createElement('option');
-      asuOption.value = ASU_PDF_LINK;
-      asuOption.textContent = '🌐 ASU Document';
-      pdfSelect.appendChild(asuOption);
-      
-      const onlineOption = document.createElement('option');
-      onlineOption.value = 'https://raw.githubusercontent.com/hameedktk09/Pdf-Flipper/main/Applied%20Math%20Study%20Materials%202024-25.pdf';
-      onlineOption.textContent = '🌐 Online Backup';
-      pdfSelect.appendChild(onlineOption);
-    }
-
-    async function loadPDFFromFile(filePath) {
-      updateStatus(`loading ${filePath}...`, false, true);
-      try {
-        const response = await fetch(filePath);
-        if (!response.ok) throw new Error("Failed to load PDF");
-        const data = await response.arrayBuffer();
-        let title = filePath.replace('.pdf', '').replace(/_/g, ' ').replace(/-/g, ' ');
-        renderPDF(data, true, title);
-      } catch (err) {
-        updateStatus(`failed to load: ${err.message}`, false, false);
-        buildSamplePages();
-      }
-    }
-
-    pdfSelect.addEventListener('change', (e) => {
-      if (e.target.value) {
-        if (e.target.value === 'sample') {
-          buildSamplePages();
-        } else if (e.target.value.startsWith('http')) {
-          // Handle both ASU link and other online PDFs
-          autoFetchPDF(e.target.value);
-        } else {
-          loadPDFFromFile(e.target.value);
-        }
-      }
-    });
-
-    async function autoFetchPDF(url, customTitle = '') {
-      updateStatus("loading online PDF...", false, true);
-      try {
-        // Use proxy for external URLs to avoid CORS
-        const proxyUrl = 'https://api.allorigins.win/raw?url=';
-        const targetUrl = encodeURIComponent(url);
-        
-        const response = await fetch(proxyUrl + targetUrl);
-        if (!response.ok) throw new Error("Failed to load");
-        
-        const data = await response.arrayBuffer();
-        let pdfTitle = customTitle || (url.includes('asu') ? 'ASU Document' : 'Online Document');
-        renderPDF(data, true, pdfTitle);
-      } catch (err) {
-        console.error("Error loading online PDF:", err);
-        updateStatus("online fetch failed", false, false);
-        buildSamplePages();
-      }
-    }
-
-    document.getElementById('fileInput').addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      updateStatus("reading file...", false, true);
-      const reader = new FileReader();
-      reader.onload = function(ev) { 
-        let title = file.name.replace('.pdf', '').replace(/_/g, ' ');
-        renderPDF(ev.target.result, true, title);
-      };
-      reader.readAsArrayBuffer(file);
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === "ArrowRight") {
-        if (currentPagePair < pages.length - 1) flipToPage(currentPagePair + 1);
-      } else if (e.key === "ArrowLeft") {
-        if (currentPagePair >= 0) flipToPage(currentPagePair - 1);
-      }
-    });
-
-    let pages = [];
-    let currentPagePair = -1;
+    let pages = [];                 
+    let currentPagePair = -1;       
     let pdfDocRef = null;
+    let currentBlob = null;
+    let usingSamplePages = true;
+    let totalPdfPages = 0;
 
-    // Sample page creation functions
-    function createSamplePage1() {
-      const face = document.createElement('div');
-      face.className = 'page-face front sample-page';
-      face.innerHTML = `
-        <h2>Introduction to 3D Flipbooks</h2>
-        <p>This is a sample page showing how uploaded PDF content will appear in the 3D flipbook. The page uses a subtle grid background to represent typical document layout.</p>
-        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.</p>
-        <p>When you upload your own PDF, pages will be rendered here with actual content. The flip animation and navigation work exactly the same way.</p>
-        <div class="page-number">— 1 —</div>
-      `;
-      return face;
+    function playFlip() {
+      flipSound.currentTime = 0;
+      flipSound.play().catch(() => {}); 
     }
 
-    function createSamplePage2() {
-      const face = document.createElement('div');
-      face.className = 'page-face back sample-page';
-      face.innerHTML = `
-        <h2>Features Overview</h2>
-        <p>• Realistic page flip animation with sound<br>
-        • Keyboard arrow navigation<br>
-        • Automatic PDF scanning from folder<br>
-        • Front matter and back matter pages<br>
-        • Status light shows loading/success states</p>
-        <p>The back cover matters page is now correctly visible when you flip to the last page.</p>
-        <div class="page-number">— 2 —</div>
-      `;
-      return face;
+    function updateSpine() {
+      if (currentPagePair === -1 || currentPagePair === pages.length - 1) {
+        coverSpine.classList.add('visible');
+      } else {
+        coverSpine.classList.remove('visible');
+      }
     }
 
-    // Front matters - will appear on the back of front cover
-    function createFrontMattersFace() {
-      const face = document.createElement('div');
-      face.className = 'page-face back cover-page';
-      face.style.flexDirection = 'column';
-      face.style.justifyContent = 'center';
-      face.style.alignItems = 'center';
-      face.innerHTML = `
-        <div style="font-size: 20px; font-weight: 700; color: #1e3a8a; margin-bottom: 20px;">FRONT MATTERS</div>
-        <div style="font-size: 14px; color: #334155; max-width: 80%; text-align: center; line-height: 1.6;">This page contains front matters such as table of contents, preface, and acknowledgments.</div>
-        <div style="margin-top: 40px; font-size: 11px; color: #64748b;">— inside front cover —</div>
-      `;
-      return face;
-    }
-
-    // Back cover matters - will appear on the front face of back cover page
-    function createBackMattersFace() {
-      const face = document.createElement('div');
-      face.className = 'page-face front cover-page';
-      face.style.flexDirection = 'column';
-      face.style.justifyContent = 'center';
-      face.style.alignItems = 'center';
-      face.innerHTML = `
-        <div style="font-size: 20px; font-weight: 700; color: #1e3a8a; margin-bottom: 20px;">BACK COVER MATTERS</div>
-        <div style="font-size: 14px; color: #334155; max-width: 80%; text-align: center; line-height: 1.6;">This is the inside of the back cover. It now appears correctly when you flip to the last page.</div>
-        <div style="margin-top: 40px; font-size: 11px; color: #64748b;">— inside back cover —</div>
-      `;
-      return face;
-    }
-
-    function createFrontCoverFace(titleText) {
-      const face = document.createElement('div');
-      face.className = 'page-face front cover-page';
-      face.style.flexDirection = 'column';
-      face.innerHTML = `
-        <div style="font-size: 12px; letter-spacing: 4px; color: #1e3a8a; margin-bottom: 20px;">PDF ARCHIVE</div>
-        <div style="font-size: 32px; font-weight: 800; color: #0f172a; text-align: center; line-height: 1.2;">${titleText}</div>
-        <div style="margin-top: 30px; font-size: 16px; color: #334155;">interactive 3D book</div>
-        <div style="margin-top: 40px; font-size: 12px; color: #475569;">digital document viewer</div>
-      `;
-      return face;
-    }
-
-    function createBackCoverFace() {
-      const face = document.createElement('div');
-      face.className = 'page-face back cover-page';
-      face.style.flexDirection = 'column';
-      face.innerHTML = `
-        <div style="font-size: 24px; font-weight: 300; margin-bottom: 30px; color: #1e293b;">✧ PDF flipper ✧</div>
-        <div style="font-size: 18px; font-style: italic; max-width: 80%; text-align: center; border-bottom: 1px solid #94a3b8; padding-bottom: 20px; color: #334155;">“Turn pages like a real book”</div>
-        <div style="margin-top: 40px; font-size: 12px; color: #475569;">3D flipbook · open format</div>
-      `;
-      return face;
-    }
-
-    // Build sample pages with properly positioned back cover matters
-    function buildSamplePages() {
-      usingSamplePages = true;
-      pdfDocRef = null;
-      bookContainer.innerHTML = '';
-      pages = [];
-      currentPagePair = -1;
-
-      // Front cover page - front face = front cover, back face = front matters
-      const frontPage = document.createElement('div');
-      frontPage.className = 'page';
-      frontPage.style.zIndex = 10;
-      const frontCover = createFrontCoverFace('Sample PDF');
-      const frontMatters = createFrontMattersFace();
-      frontMatters.classList.add('back');
-      frontPage.appendChild(frontCover);
-      frontPage.appendChild(frontMatters);
-      frontPage.onclick = () => flipToPage(0);
-      bookContainer.appendChild(frontPage);
-      pages.push(frontPage);
-
-      // Sample content page (spread 1)
-      const samplePage1 = document.createElement('div');
-      samplePage1.className = 'page';
-      samplePage1.style.zIndex = 8;
-      const sample1Front = createSamplePage1();
-      sample1Front.classList.add('front');
-      const sample1Back = createSamplePage2();
-      sample1Back.classList.add('back');
-      samplePage1.appendChild(sample1Front);
-      samplePage1.appendChild(sample1Back);
-      samplePage1.onclick = () => flipToPage(1);
-      bookContainer.appendChild(samplePage1);
-      pages.push(samplePage1);
-
-      // Back cover page - front face = back matters, back face = back cover
-      const backPage = document.createElement('div');
-      backPage.className = 'page';
-      backPage.style.zIndex = 6;
-      const backMatters = createBackMattersFace();
-      backMatters.classList.add('front');
-      const backCover = createBackCoverFace();
-      backCover.classList.add('back');
-      backPage.appendChild(backMatters);
-      backPage.appendChild(backCover);
-      backPage.onclick = () => flipToPage(2);
-      bookContainer.appendChild(backPage);
-      pages.push(backPage);
-
-      flipToPage(-1);
-      updateStatus("sample pages ready", false, false);
-      pageLabel.innerText = "p.1-2 / 3";
-    }
-
-    async function renderPDF(data, triggerSuccess = false, docTitle = 'ASU Document') {
-      try {
-        usingSamplePages = false;
-        updateStatus("Rendering PDF...", false, true);
-        const pdf = await pdfjsLib.getDocument({ data }).promise;
-        pdfDocRef = pdf;
-        
-        updateStatus("✅ Loaded!", true, false);
-        pageLabel.innerText = `p.1-1 / ${pdf.numPages}`;
-
-        bookContainer.innerHTML = '';
-        pages = [];
-
-        // Front cover page with front matters as back face
-        const frontCoverPage = document.createElement('div');
-        frontCoverPage.className = 'page';
-        frontCoverPage.style.zIndex = pdf.numPages + 10;
-        const frontCoverFace = createFrontCoverFace(docTitle);
-        const frontMattersFace = createFrontMattersFace();
-        frontMattersFace.classList.add('back');
-        frontCoverPage.appendChild(frontCoverFace);
-        frontCoverPage.appendChild(frontMattersFace);
-        frontCoverPage.onclick = () => flipToPage(0);
-        bookContainer.appendChild(frontCoverPage);
-        pages.push(frontCoverPage);
-
-        // PDF content pages
-        for (let i = 1; i <= pdf.numPages; i += 2) {
-          const pageEl = document.createElement('div');
-          pageEl.className = 'page';
-          pageEl.style.zIndex = pdf.numPages - i + 5;
-
-          const front = await createFace(pdf, i, 'front');
-          const back = (i + 1 <= pdf.numPages) ? await createFace(pdf, i + 1, 'back') : createBlankBack();
-
-          pageEl.appendChild(front);
-          pageEl.appendChild(back);
-          const idx = pages.length;
-          pageEl.onclick = () => flipToPage(idx);
-          bookContainer.appendChild(pageEl);
-          pages.push(pageEl);
+    function makePageClickHandler(pageElement, index) {
+      const handleAction = (x, width) => {
+        if (x > width / 2) {
+          if (currentPagePair < pages.length - 1) flipToPage(currentPagePair + 1);
+        } else {
+          if (currentPagePair >= 0) flipToPage(currentPagePair - 1);
         }
+      };
 
-        // Back cover page with back matters as front face
-        const backCoverPage = document.createElement('div');
-        backCoverPage.className = 'page';
-        backCoverPage.style.zIndex = 1;
-        const backMattersFace = createBackMattersFace();
-        backMattersFace.classList.add('front');
-        const backCoverFace = createBackCoverFace();
-        backCoverFace.classList.add('back');
-        backCoverPage.appendChild(backMattersFace);
-        backCoverPage.appendChild(backCoverFace);
-        backCoverPage.onclick = () => flipToPage(pages.length);
-        bookContainer.appendChild(backCoverPage);
-        pages.push(backCoverPage);
+      pageElement.onclick = (e) => {
+        const rect = pageElement.getBoundingClientRect();
+        handleAction(e.clientX - rect.left, rect.width);
+      };
 
-        flipToPage(-1);
-        updatePageLabel(pdf.numPages);
-      } catch (err) {
-        updateStatus("Error: " + err.message, false, false);
-        buildSamplePages();
-      }
-    }
-
-    async function createFace(pdf, num, type) {
-      const face = document.createElement('div');
-      face.className = 'page-face ' + type;
-      const canvas = document.createElement('canvas');
-      try {
-        const page = await pdf.getPage(num);
-        const viewport = page.getViewport({ scale: 1.3 });
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-      } catch (e) {
-        canvas.style.background = '#f1f5f9';
-      }
-      face.appendChild(canvas);
-      return face;
-    }
-
-    function createBlankBack() {
-      const face = document.createElement('div');
-      face.className = 'page-face back';
-      face.style.background = '#f1f5f9';
-      return face;
-    }
-
-    function updatePageLabel(totalPages) {
-      if (pdfDocRef) {
-        let right = currentPagePair === -1 ? 1 : (currentPagePair * 2 + 1);
-        let left = right - 1;
-        if (currentPagePair === -1) left = 1;
-        pageLabel.innerText = `p.${left}-${Math.min(right, totalPages)} / ${totalPages}`;
-      }
+      let touchStartX = 0;
+      pageElement.ontouchstart = (e) => { touchStartX = e.touches[0].clientX; };
+      pageElement.ontouchend = (e) => {
+        const touchEndX = e.changedTouches[0].clientX;
+        const rect = pageElement.getBoundingClientRect();
+        if (Math.abs(touchEndX - touchStartX) < 10) {
+            handleAction(touchStartX - rect.left, rect.width);
+        } else if (touchStartX > touchEndX) { 
+            if (currentPagePair < pages.length - 1) flipToPage(currentPagePair + 1);
+        } else { 
+            if (currentPagePair >= 0) flipToPage(currentPagePair - 1);
+        }
+      };
     }
 
     function flipToPage(index) {
-      if (flipSound) { 
-        flipSound.currentTime = 0; 
-        flipSound.play().catch(() => {}); 
-      }
+      playFlip();
       pages.forEach((p, i) => {
         if (i <= index) {
           p.classList.add('flipped');
-          p.style.zIndex = 100 + i;
+          setTimeout(() => { p.style.zIndex = 100 + i; }, 200);
         } else {
           p.classList.remove('flipped');
           p.style.zIndex = pages.length - i;
         }
       });
       currentPagePair = index;
-      
-      if (pdfDocRef) {
-        let total = pdfDocRef.numPages;
-        let right = index === -1 ? 1 : (index * 2 + 1);
-        let left = right - 1;
-        if (index === -1) left = 1;
-        pageLabel.innerText = `p.${left}-${Math.min(right, total)} / ${total}`;
-      } else if (usingSamplePages) {
+      updateSpine();
+
+      if (pdfDocRef && !usingSamplePages) {
+        let firstPage = index === -1 ? 1 : (index * 2) + 1;
+        if (firstPage > totalPdfPages) firstPage = totalPdfPages;
+        pageLabel.innerText = `p.${firstPage} / ${totalPdfPages}`;
+      } else {
         if (index === -1) pageLabel.innerText = 'p.1-2 / 3';
         else if (index === 0) pageLabel.innerText = 'p.1-2 / 3';
         else if (index === 1) pageLabel.innerText = 'p.3-3 / 3';
-        else if (index === 2) pageLabel.innerText = 'p.3-3 / 3';
       }
     }
 
-    document.getElementById('nextBtn').onclick = () => { if (currentPagePair < pages.length - 1) flipToPage(currentPagePair + 1); };
-    document.getElementById('prevBtn').onclick = () => { if (currentPagePair >= 0) flipToPage(currentPagePair - 1); };
+    function showPreview() {
+      usingSamplePages = true;
+      pdfDocRef = null;
+      currentBlob = null;
+      bookContainer.innerHTML = '';
+      pages = [];
 
-    // Start by loading the ASU PDF
-    loadASUPDF();
-  </script>
+      const frontCover = document.createElement('div');
+      frontCover.className = 'page-face front cover-page preview-cover';
+      frontCover.innerHTML = `<h1>PDF-Flipper</h1><h2>ASU CLFS</h2>`;
+
+      const frontInside = document.createElement('div');
+      frontInside.className = 'page-face back cover-page';
+      frontInside.innerHTML = `<div style="font-family:Georgia; text-align:center; padding:2rem;"><h3 style="color:#1e3a8a;">Front Matters</h3></div>`;
+
+      const page1 = document.createElement('div');
+      page1.className = 'page';
+      page1.style.zIndex = 10;
+      page1.appendChild(frontCover);
+      page1.appendChild(frontInside);
+      makePageClickHandler(page1, 0);
+      bookContainer.appendChild(page1);
+      pages.push(page1);
+
+      const innerFront = document.createElement('div');
+      innerFront.className = 'page-face front inner-page';
+      const innerBack = document.createElement('div');
+      innerBack.className = 'page-face back inner-page';
+      const page2 = document.createElement('div');
+      page2.className = 'page';
+      page2.style.zIndex = 8;
+      page2.appendChild(innerFront);
+      page2.appendChild(innerBack);
+      makePageClickHandler(page2, 1);
+      bookContainer.appendChild(page2);
+      pages.push(page2);
+
+      const backInside = document.createElement('div');
+      backInside.className = 'page-face front cover-page';
+      backInside.innerHTML = `<div style="font-family:Georgia; text-align:center;"><h3 style="color:#1e3a8a;">Back Matters</h3></div>`;
+      const backCover = document.createElement('div');
+      backCover.className = 'page-face back cover-page';
+      backCover.innerHTML = `<h2 style="color:#1e3a8a; text-align:center;">ASU Oman</h2>`;
+
+      const page3 = document.createElement('div');
+      page3.className = 'page';
+      page3.style.zIndex = 6;
+      page3.appendChild(backInside);
+      page3.appendChild(backCover);
+      makePageClickHandler(page3, 2);
+      bookContainer.appendChild(page3);
+      pages.push(page3);
+
+      flipToPage(-1);
+      readyLight.className = 'status-light active';
+    }
+
+    async function renderPDF(arrayBuffer, title = 'Document') {
+      try {
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        pdfDocRef = pdf;
+        totalPdfPages = pdf.numPages;
+        usingSamplePages = false;
+        currentBlob = new Blob([arrayBuffer], { type: 'application/pdf' });
+
+        const firstPageObj = await pdf.getPage(1);
+        const vp = firstPageObj.getViewport({ scale: 1 });
+        const ratio = vp.height / vp.width;
+        
+        const newWidth = 480; 
+        const newHeight = newWidth * ratio;
+        document.documentElement.style.setProperty('--book-height', `${newHeight}px`);
+        document.documentElement.style.setProperty('--book-width', `${newWidth}px`);
+
+        bookContainer.innerHTML = '';
+        pages = [];
+
+        const frontCoverDiv = document.createElement('div');
+        frontCoverDiv.className = 'page-face front cover-page';
+        frontCoverDiv.innerHTML = `<h3 style="text-align:center; font-size:32px; color:#1e3a8a; padding: 20px;">${title}</h3>`;
+        const frontInsideDiv = document.createElement('div');
+        frontInsideDiv.className = 'page-face back cover-page';
+        frontInsideDiv.innerHTML = `<div style="padding:1.5rem; text-align:center;">Frontispiece</div>`;
+
+        const frontPage = document.createElement('div');
+        frontPage.className = 'page';
+        frontPage.style.zIndex = pdf.numPages + 20;
+        frontPage.appendChild(frontCoverDiv);
+        frontPage.appendChild(frontInsideDiv);
+        makePageClickHandler(frontPage, 0);
+        bookContainer.appendChild(frontPage);
+        pages.push(frontPage);
+
+        for (let i = 1; i <= pdf.numPages; i += 2) {
+          const leftPageNum = i;
+          const rightPageNum = i + 1 <= pdf.numPages ? i + 1 : null;
+          const leftFace = document.createElement('div');
+          leftFace.className = 'page-face front inner-page';
+          const rightFace = document.createElement('div');
+          rightFace.className = 'page-face back inner-page';
+
+          const renderToFace = async (num, face) => {
+            try {
+              const page = await pdf.getPage(num);
+              const viewport = page.getViewport({ scale: 2.0 }); 
+              const canvas = document.createElement('canvas');
+              canvas.width = viewport.width;
+              canvas.height = viewport.height;
+              await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+              face.appendChild(canvas);
+            } catch (e) {
+              face.innerHTML = `<span style="color:gray;">Error page ${num}</span>`;
+            }
+          };
+
+          await renderToFace(leftPageNum, leftFace);
+          if (rightPageNum) await renderToFace(rightPageNum, rightFace);
+          else rightFace.style.background = '#f1f5f9';
+
+          const spread = document.createElement('div');
+          spread.className = 'page';
+          spread.style.zIndex = pdf.numPages - i + 10;
+          spread.appendChild(leftFace);
+          spread.appendChild(rightFace);
+          makePageClickHandler(spread, pages.length);
+          bookContainer.appendChild(spread);
+          pages.push(spread);
+        }
+
+        const backInsideDiv = document.createElement('div');
+        backInsideDiv.className = 'page-face front cover-page';
+        backInsideDiv.innerHTML = `<div style="text-align:center;">Back Notes</div>`;
+        const backCoverDiv = document.createElement('div');
+        backCoverDiv.className = 'page-face back cover-page';
+        backCoverDiv.innerHTML = `<h3 style="color:#1e3a8a; text-align:center;">A'Sharqiyah University</h3>`;
+
+        const backPage = document.createElement('div');
+        backPage.className = 'page';
+        backPage.style.zIndex = 1;
+        backPage.appendChild(backInsideDiv);
+        backPage.appendChild(backCoverDiv);
+        makePageClickHandler(backPage, pages.length);
+        bookContainer.appendChild(backPage);
+        pages.push(backPage);
+
+        flipToPage(-1);
+        readyLight.className = 'status-light active';
+      } catch (err) {
+        showPreview();
+      }
+    }
+
+    pdfSelect.onchange = (e) => {
+      const val = e.target.value;
+      if (!val) return;
+      if (val.startsWith('http')) {
+        readyLight.className = 'status-light loading';
+        fetch(val).then(r => r.arrayBuffer()).then(buf => renderPDF(buf, 'Online Doc')).catch(() => showPreview());
+      }
+    };
+
+    fileInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      readyLight.className = 'status-light loading';
+      reader.onload = (ev) => renderPDF(ev.target.result, file.name.replace('.pdf', ''));
+      reader.readAsArrayBuffer(file);
+    };
+
+    toggleDark.onclick = () => document.body.classList.toggle('dark-mode');
+    toggleFull.onclick = () => {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    };
+
+    jumpInput.onchange = (e) => {
+      if (!pdfDocRef) return;
+      const p = parseInt(e.target.value);
+      if (p > 0 && p <= totalPdfPages) {
+        const spreadIdx = Math.floor((p - 1) / 2);
+        flipToPage(spreadIdx);
+      }
+    };
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') {
+        if (currentPagePair < pages.length - 1) flipToPage(currentPagePair + 1);
+      } else if (e.key === 'ArrowLeft') {
+        if (currentPagePair >= 0) flipToPage(currentPagePair - 1);
+      }
+    });
+
+    downloadBtn.onclick = () => {
+      if (currentBlob) {
+        const url = URL.createObjectURL(currentBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'document.pdf';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    };
+
+    showPreview();
+    pdfSelect.innerHTML = '<option value="">📖 Select...</option><option value="Sample.pdf">Sample</option>';
+  })();
+</script>
 </body>
 </html>
